@@ -27,19 +27,23 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
-# Model outputs / large binaries
-outputs/checkpoints/*.pt
-outputs/checkpoints/*.pth
-outputs/checkpoints/*.ckpt
-outputs/samples/*.pt
-outputs/samples/*.npy
-outputs/samples/*.npz
+# Outputs (large or generated files should not be committed)
+outputs/checkpoints/*
+outputs/samples/*
+outputs/figures/*
+outputs/tables/*
+outputs/logs/*
+!outputs/checkpoints/.gitkeep
+!outputs/samples/.gitkeep
+!outputs/figures/.gitkeep
+!outputs/tables/.gitkeep
+!outputs/logs/.gitkeep
 
-# Logs
-outputs/logs/*.log
-outputs/logs/*.txt
+# Logs / experiment tracking
 wandb/
 *.tfevents.*
+*.log
+*.txt
 
 # OS
 .DS_Store
