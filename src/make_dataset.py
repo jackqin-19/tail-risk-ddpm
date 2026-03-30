@@ -20,6 +20,7 @@ REQUIRED_COLUMNS = {
     "volume",
     "amount",
 }
+CONFIGURABLE_FIELDS = REQUIRED_COLUMNS - {"asset"}
 CONTINUOUS_CONDITIONS = ["cumret_5d", "vol_20d", "amount_change_5d"]
 ALL_CONDITIONS = CONTINUOUS_CONDITIONS + ["high_vol"]
 
@@ -69,6 +70,26 @@ def load_prices(prices_path: Path) -> pd.DataFrame:
     prices = prices.dropna(subset=["trade_date", "asset", "close", "amount"])
     prices = prices.sort_values(["trade_date", "asset"]).reset_index(drop=True)
     return prices
+
+
+def apply_date_filter(
+    prices: pd.DataFrame,
+    start_date: str | None,
+    end_date: str | None,
+) -> pd.DataFrame:
+    filtered = prices
+    if start_date:
+        start_ts = pd.Timestamp(start_date)
+        filtered = filtered[filtered["trade_date"] >= start_ts]
+    if end_date:
+        end_ts = pd.Timestamp(end_date)
+        filtered = filtered[filtered["trade_date"] <= end_ts]
+    filtered = filtered.sort_values(["trade_date", "asset"]).reset_index(drop=True)
+    if filtered.empty:
+        raise ValueError(
+            f"No rows left after date filtering start_date={start_date}, end_date={end_date}."
+        )
+    return filtered
 
 
 def resolve_assets(
@@ -342,6 +363,25 @@ def main() -> None:
 
     config = load_config(config_path)
     prices = load_prices(prices_path)
+
+    start_date = config.get("start_date")
+    end_date = config.get("end_date")
+    prices = apply_date_filter(prices, start_date=start_date, end_date=end_date)
+
+    configured_fields = config.get("fields")
+    if configured_fields:
+        configured_fields_set = set(configured_fields)
+        missing_required = CONFIGURABLE_FIELDS - configured_fields_set
+        if missing_required:
+            raise ValueError(
+                f"configs/data.yaml fields missing required columns: {sorted(missing_required)}"
+            )
+        extra_fields = configured_fields_set - CONFIGURABLE_FIELDS
+        if extra_fields:
+            print(
+                f"[warn] configs/data.yaml has extra fields not used by make_dataset.py: "
+                f"{sorted(extra_fields)}"
+            )
 
     configured_assets = config.get("assets")
     assets = resolve_assets(prices, configured_assets, strict_assets=args.strict_assets)

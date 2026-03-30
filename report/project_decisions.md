@@ -38,4 +38,4 @@
 - minimal conditional DDPM
 - MLP backbone first
 - tail sample weight = 3
-- Implementation status: pending (model/training/sampling scripts are placeholders)
+- Implementation status: complete for C module (`model.py`, `diffusion.py`, `train.py`, `sample.py`)

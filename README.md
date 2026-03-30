@@ -34,7 +34,10 @@ This repository implements the midterm MVP of our project:
   - config: `configs/data.yaml`
   - outputs: `data/processed/features.parquet`, `dataset_train.npz`, `dataset_valid.npz`,
     `dataset_test.npz`, `tail_stats.json`
-- C module: placeholder files only (not implemented yet)
+- C module: implemented and runnable
+  - scripts: `src/model.py`, `src/diffusion.py`, `src/train.py`, `src/sample.py`
+  - outputs: `outputs/checkpoints/latest.pt`, `outputs/checkpoints/best.pt`,
+    `outputs/logs/train_log.csv`, `outputs/samples/sample_*.npy`
 - D module: placeholder files only (not implemented yet)
 
 ## Environment
@@ -65,7 +68,29 @@ This repository implements the midterm MVP of our project:
 
 Notes:
 - `make_dataset.py` builds a balanced panel using common dates across selected assets.
+- `configs/data.yaml` `start_date` / `end_date` are applied before panel alignment.
 - With current asset pool, common-date range is `2020-11-16` to latest trading day.
+
+## Model Pipeline (C)
+1. Train conditional DDPM:
+   - `python src/train.py`
+2. Generate conditional samples:
+   - `python src/sample.py`
+3. Generated files:
+   - `outputs/checkpoints/latest.pt`
+   - `outputs/checkpoints/best.pt`
+   - `outputs/logs/train_log.csv`
+   - `outputs/samples/sample_{condition}_{ckpt}.npy`
+   - `outputs/samples/sample_{condition}_{ckpt}_price.npy`
+   - `outputs/samples/sample_{condition}_{ckpt}_traj.npy` (when `save_trajectory: true`)
+   - `outputs/samples/sample_{condition}_{ckpt}_traj_steps.npy` (when `save_trajectory: true`)
+
+Notes:
+- `sample_{condition}_{ckpt}.npy`: 20-step log-return paths `[num_samples, 20, N]`.
+- `{condition}` comes from keys under `conditions` in `configs/sample.yaml` (safe-sanitized).
+- `_price.npy`: includes explicit baseline `t0=1`, shape `[num_samples, 21, N]`.
+- `_traj.npy` is sparsely saved trajectory (default interval=20) in `float32`,
+  with aligned step index file `_traj_steps.npy` in `int32`, ordered from `T` to `0`.
 
 ## Current Scope
 Midterm only:

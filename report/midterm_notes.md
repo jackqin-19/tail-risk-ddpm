@@ -6,14 +6,14 @@
 |-----------|--------|
 | Data download & preprocessing | Complete |
 | Dataset / DataLoader | Complete |
-| Model skeleton (1-D U-Net) | Pending |
-| Diffusion forward/reverse process | Pending |
-| Training loop | Pending |
-| DDIM sampler | Pending |
+| Model skeleton (MLP backbone) | Complete |
+| Diffusion forward/reverse process | Complete |
+| Training loop | Complete |
+| DDPM sampler | Complete |
 | Evaluation (VaR, ES, KS, Spearman) | Pending |
 | Attribution (marginal + Shapley) | Pending |
 | Exploratory notebooks | Complete |
-| End-to-end run on real data | Pending |
+| End-to-end run on real data | Complete (A->B->C) |
 | Hyperparameter tuning | Pending |
 | Report write-up | Pending |
 
@@ -33,7 +33,8 @@
 - A module produces `prices.parquet` with full-history coverage from 2015 onward.
 - B module produces balanced-panel datasets (`dataset_train/valid/test.npz`) from common dates.
 - With current asset pool, common-date range starts at 2020-11-16 due to asset listing dates.
-- Training/evaluation findings are not finalized because C and D scripts are still placeholders.
+- C module now trains and samples successfully on current dataset with saved checkpoints and sample artifacts.
+- Evaluation findings are not finalized because D module is still pending.
 
 ---
 
@@ -41,7 +42,7 @@
 
 - [x] Run `download_data.py` -> `preprocess.py` end-to-end.
 - [x] Run `make_dataset.py` and generate `dataset_*.npz`.
-- [ ] Implement `model.py`, `diffusion.py`, `train.py`, and `sample.py`.
+- [x] Implement `model.py`, `diffusion.py`, `train.py`, and `sample.py`.
 - [ ] Implement `evaluate.py` and `attribution.py`.
 - [ ] Run end-to-end training, sampling, and evaluation.
 - [ ] Finalize report section with quantitative tables and figures.

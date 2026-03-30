@@ -44,6 +44,21 @@ Related files:
 ## sample outputs
 - file name format: sample_{condition}_{ckpt}.npy
 - generated paths shape: [num_samples, 20, N]
+- dtype: float32
 
-Note:
-- Sampling outputs are not available yet because `src/sample.py` is currently a placeholder.
+Additional sample artifacts:
+- `sample_{condition}_{ckpt}_price.npy`:
+  - explicit baseline `t0=1` included
+  - shape: [num_samples, 21, N]
+  - dtype: float32
+- `sample_{condition}_{ckpt}_traj.npy` (when `save_trajectory=true`):
+  - sparse reverse-diffusion trajectory
+  - dtype: float32
+- `sample_{condition}_{ckpt}_traj_steps.npy` (when `save_trajectory=true`):
+  - integer step indices aligned with `traj` first dimension
+  - order: reverse sampling order from `T` to `0`
+  - dtype: int32
+
+Notes:
+- `sample_{condition}_{ckpt}.npy` stores 20-step log-return paths.
+- `_price.npy` is derived from log-returns via cumulative sum + exponential.
