@@ -10,3 +10,7 @@ torch
 tqdm
 pyyaml
 jupyter
+notebook
+jupyterlab
+ipykernel
+nbformat
