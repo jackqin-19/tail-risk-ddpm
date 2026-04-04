@@ -69,19 +69,83 @@ Notes:
 
 ### Evaluation tables
 - `outputs/tables/d_real_risk_metrics.csv`
+  - columns:
+    - `horizon`
+    - `alpha`
+    - `baseline_scope` (`overall_test`)
+    - `count`
+    - `mean`
+    - `std`
+    - `var_5pct`
+    - `es_5pct`
+    - `var_alpha`
+    - `es_alpha`
+    - `worst`
 - `outputs/tables/d_generated_risk_metrics.csv`
+  - columns:
+    - `condition`
+    - `checkpoint`
+    - `horizon`
+    - `alpha`
+    - `count`
+    - `mean`
+    - `std`
+    - `var_5pct`
+    - `es_5pct`
+    - `var_alpha`
+    - `es_alpha`
+    - `worst`
+    - `source_file`
 - `outputs/tables/d_distribution_compare.csv`
+  - columns:
+    - `condition`
+    - `checkpoint`
+    - `horizon`
+    - `ks_stat`
+    - `ks_pvalue`
+    - `spearman_hist`
+    - `wasserstein_distance`
 
 ### Attribution table
 - `outputs/tables/d_factor_sensitivity.csv`
+  - columns (current):
+    - `checkpoint`
+    - `base_condition`
+    - `factor`
+    - `factor_value`
+    - `horizon`
+    - `alpha`
+    - `count`
+    - `mean`
+    - `std`
+    - `var_5pct`
+    - `es_5pct`
+    - `var_alpha`
+    - `es_alpha`
+    - `worst`
+    - `delta_var_5pct`
+    - `delta_es_5pct`
+- `outputs/tables/d_factor_sensitivity_meta.json`
+  - fields:
+    - `checkpoint`
+    - `base_condition`
+    - `n_samples`
+    - `factor_values`
+    - `high_vol_values`
+    - `timesteps`
+    - `seed`
 
 ### D figures
 - `outputs/figures/d_return_dist_last_day.png`
 - `outputs/figures/d_left_tail_compare_last_day.png`
 - `outputs/figures/d_es_by_condition_last_day.png`
+- `outputs/figures/d_return_dist_cum_20d.png`
+- `outputs/figures/d_left_tail_compare_cum_20d.png`
+- `outputs/figures/d_es_by_condition_cum_20d.png`
 - `outputs/figures/d_factor_sensitivity_es_last_day.png`
 - `outputs/figures/d_factor_sensitivity_es_cum_20d.png`
 
 Conventions:
 - Evaluation horizons use `last_day` and `cum_20d`.
+- `evaluate.py` supports `--checkpoint-filter latest|best|all` (default: `latest`).
 - Attribution rows include baseline and per-factor perturbation records.

@@ -104,25 +104,35 @@ Notes:
 
 ## Evaluation & Attribution Pipeline (D)
 1. Evaluate real vs generated risk metrics:
-   - `python src/evaluate.py`
+   - `python src/evaluate.py --checkpoint-filter latest --seed 42`
 2. Run single-factor what-if attribution:
-   - `python src/attribution.py`
+   - `python src/attribution.py --seed 42`
 3. Generated files:
    - `outputs/tables/d_real_risk_metrics.csv`
    - `outputs/tables/d_generated_risk_metrics.csv`
    - `outputs/tables/d_distribution_compare.csv`
    - `outputs/tables/d_factor_sensitivity.csv`
+   - `outputs/tables/d_factor_sensitivity_meta.json`
    - `outputs/figures/d_return_dist_last_day.png`
    - `outputs/figures/d_left_tail_compare_last_day.png`
    - `outputs/figures/d_es_by_condition_last_day.png`
+   - `outputs/figures/d_return_dist_cum_20d.png`
+   - `outputs/figures/d_left_tail_compare_cum_20d.png`
+   - `outputs/figures/d_es_by_condition_cum_20d.png`
    - `outputs/figures/d_factor_sensitivity_es_last_day.png`
    - `outputs/figures/d_factor_sensitivity_es_cum_20d.png`
 
 Notes:
 - `evaluate.py` compares real test-set windows with generated samples on two horizons:
   `last_day` and `cum_20d`.
+- `evaluate.py` supports `--checkpoint-filter latest|best|all` (default `latest`) to avoid
+  mixing checkpoints in one run.
+- D risk tables include both legacy columns (`var_5pct`, `es_5pct`) and generic columns
+  (`alpha`, `var_alpha`, `es_alpha`) for compatibility and clarity.
 - `attribution.py` perturbs one condition factor at a time and reports
   risk-metric deltas (`delta_var_5pct`, `delta_es_5pct`) relative to the base condition.
+- `d_factor_sensitivity_meta.json` records the run configuration
+  (`checkpoint`, `base_condition`, `n_samples`, factor grids, `timesteps`, `seed`).
 
 ## Current Scope
 Midterm only:

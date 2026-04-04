@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import random
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +26,8 @@ WINDOW_LENGTH = 20
 COND_DIM = 4
 CONTINUOUS_FACTORS = ["cumret_5d", "vol_20d", "amount_change_5d"]
 ALL_FACTORS = CONTINUOUS_FACTORS + ["high_vol"]
+ALPHA = 0.05
+SEED = 42
 
 
 @dataclass
@@ -67,7 +71,17 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional override DDPM timesteps for quick debugging",
     )
+    parser.add_argument("--alpha", type=float, default=ALPHA, help="Tail probability (default=0.05)")
+    parser.add_argument("--seed", type=int, default=SEED, help="Random seed for reproducibility")
     return parser.parse_args()
+
+
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def load_yaml(path: Path) -> dict:
@@ -126,14 +140,17 @@ def condition_vector_from_mapping(mapping: dict) -> np.ndarray:
     )
 
 
-def risk_metrics(returns: np.ndarray, alpha: float = 0.05) -> dict[str, float]:
+def risk_metrics(returns: np.ndarray, alpha: float = ALPHA) -> dict[str, float]:
     q = float(np.quantile(returns, alpha))
     tail = returns[returns <= q]
     es = float(tail.mean()) if tail.size else q
     return {
+        "alpha": float(alpha),
         "count": int(returns.size),
         "mean": float(np.mean(returns)),
         "std": float(np.std(returns, ddof=1)) if returns.size > 1 else 0.0,
+        "var_alpha": q,
+        "es_alpha": es,
         "var_5pct": q,
         "es_5pct": es,
         "worst": float(np.min(returns)),
@@ -221,6 +238,12 @@ def plot_factor_sensitivity(df: pd.DataFrame, out_path: Path, horizon: str) -> N
 
 def main() -> None:
     args = parse_args()
+    alpha = float(args.alpha)
+    seed = int(args.seed)
+    if not 0.0 < alpha < 1.0:
+        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+    set_seed(seed)
+
     run_cfg = build_run_config(args)
     tables_dir = Path(args.tables_dir)
     figures_dir = Path(args.figures_dir)
@@ -256,11 +279,11 @@ def main() -> None:
         device=run_cfg.device,
     )
     base_last, base_cum = portfolio_returns(baseline_samples)
-    base_last_m = risk_metrics(base_last, alpha=0.05)
-    base_cum_m = risk_metrics(base_cum, alpha=0.05)
+    base_last_m = risk_metrics(base_last, alpha=alpha)
+    base_cum_m = risk_metrics(base_cum, alpha=alpha)
 
     rows: list[dict[str, object]] = []
-    baseline_row = {
+    baseline_last_row = {
         "checkpoint": run_cfg.checkpoint_label,
         "base_condition": run_cfg.base_condition_name,
         "factor": "baseline",
@@ -270,14 +293,18 @@ def main() -> None:
         "delta_var_5pct": 0.0,
         "delta_es_5pct": 0.0,
     }
-    rows.append(baseline_row)
-    rows.append(
-        {
-            **baseline_row,
-            "horizon": "cum_20d",
-            **base_cum_m,
-        }
-    )
+    baseline_cum_row = {
+        "checkpoint": run_cfg.checkpoint_label,
+        "base_condition": run_cfg.base_condition_name,
+        "factor": "baseline",
+        "factor_value": 0.0,
+        "horizon": "cum_20d",
+        **base_cum_m,
+        "delta_var_5pct": 0.0,
+        "delta_es_5pct": 0.0,
+    }
+    rows.append(baseline_last_row)
+    rows.append(baseline_cum_row)
 
     factor_to_index = {name: i for i, name in enumerate(ALL_FACTORS)}
 
@@ -296,8 +323,8 @@ def main() -> None:
                 device=run_cfg.device,
             )
             last_day, cum20 = portfolio_returns(samples)
-            m_last = risk_metrics(last_day, alpha=0.05)
-            m_cum = risk_metrics(cum20, alpha=0.05)
+            m_last = risk_metrics(last_day, alpha=alpha)
+            m_cum = risk_metrics(cum20, alpha=alpha)
 
             rows.append(
                 {
@@ -331,6 +358,17 @@ def main() -> None:
     out_csv = tables_dir / "d_factor_sensitivity.csv"
     df = pd.DataFrame(rows)
     df.to_csv(out_csv, index=False, encoding="utf-8-sig")
+    meta_path = tables_dir / "d_factor_sensitivity_meta.json"
+    meta = {
+        "checkpoint": run_cfg.checkpoint_label,
+        "base_condition": run_cfg.base_condition_name,
+        "n_samples": int(run_cfg.n_samples),
+        "factor_values": [float(v) for v in run_cfg.values_cont],
+        "high_vol_values": [float(v) for v in run_cfg.values_high_vol],
+        "timesteps": int(timesteps),
+        "seed": int(seed),
+    }
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     fig_last = figures_dir / "d_factor_sensitivity_es_last_day.png"
     fig_cum = figures_dir / "d_factor_sensitivity_es_cum_20d.png"
@@ -338,12 +376,13 @@ def main() -> None:
     plot_factor_sensitivity(df[df["factor"] != "baseline"], fig_cum, horizon="cum_20d")
 
     print(f"[saved] {out_csv}")
+    print(f"[saved] {meta_path}")
     print(f"[saved] {fig_last}")
     print(f"[saved] {fig_cum}")
     print("[summary]")
     print(
         f"  base_condition={run_cfg.base_condition_name} checkpoint={run_cfg.checkpoint_label} "
-        f"n_samples={run_cfg.n_samples} timesteps={timesteps}"
+        f"n_samples={run_cfg.n_samples} timesteps={timesteps} alpha={alpha:.4f} seed={seed}"
     )
     print(
         f"  baseline last_day: VaR5={base_last_m['var_5pct']:.6f}, ES5={base_last_m['es_5pct']:.6f}"

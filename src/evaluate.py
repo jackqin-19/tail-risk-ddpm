@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -16,6 +17,8 @@ SAMPLE_DIR = Path("outputs/samples")
 TABLES_DIR = Path("outputs/tables")
 FIGURES_DIR = Path("outputs/figures")
 ALPHA = 0.05
+CHECKPOINT_FILTER = "latest"
+SEED = 42
 
 
 @dataclass
@@ -35,7 +38,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tables-dir", default=str(TABLES_DIR), help="Output directory for CSV tables")
     parser.add_argument("--figures-dir", default=str(FIGURES_DIR), help="Output directory for figures")
     parser.add_argument("--alpha", type=float, default=ALPHA, help="Tail probability (default=0.05)")
+    parser.add_argument(
+        "--checkpoint-filter",
+        default=CHECKPOINT_FILTER,
+        choices=["latest", "best", "all"],
+        help="Only evaluate selected checkpoint samples",
+    )
+    parser.add_argument("--seed", type=int, default=SEED, help="Random seed for reproducibility")
     return parser.parse_args()
+
+
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 def compute_portfolio_returns(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -54,9 +69,12 @@ def risk_metrics(returns: np.ndarray, alpha: float) -> dict[str, float]:
     tail_mask = returns <= var_alpha
     es_alpha = float(returns[tail_mask].mean()) if np.any(tail_mask) else var_alpha
     return {
+        "alpha": float(alpha),
         "count": int(returns.size),
         "mean": float(np.mean(returns)),
         "std": float(np.std(returns, ddof=1)) if returns.size > 1 else 0.0,
+        "var_alpha": var_alpha,
+        "es_alpha": es_alpha,
         "var_5pct": var_alpha,
         "es_5pct": es_alpha,
         "worst": float(np.min(returns)),
@@ -74,13 +92,15 @@ def parse_sample_file(path: Path) -> tuple[str, str]:
     return condition, checkpoint
 
 
-def load_generated_samples(sample_dir: Path) -> list[SamplePack]:
+def load_generated_samples(sample_dir: Path, checkpoint_filter: str) -> list[SamplePack]:
     packs: list[SamplePack] = []
     for path in sorted(sample_dir.glob("sample_*.npy")):
         name = path.name
         if name.endswith("_price.npy") or name.endswith("_traj.npy") or name.endswith("_traj_steps.npy"):
             continue
         condition, checkpoint = parse_sample_file(path)
+        if checkpoint_filter != "all" and checkpoint != checkpoint_filter:
+            continue
         arr = np.load(path)
         if arr.ndim != 3:
             raise ValueError(f"Sample file must be [B, 20, N], got {path}: {arr.shape}")
@@ -114,6 +134,7 @@ def distribution_compare(real: np.ndarray, generated: np.ndarray) -> dict[str, f
         "ks_stat": float(ks_stat),
         "ks_pvalue": float(ks_pvalue),
         "spearman_hist": histogram_spearman(real, generated),
+        "wasserstein_distance": float(stats.wasserstein_distance(real, generated)),
     }
 
 
@@ -141,14 +162,15 @@ def save_tables(
 
 def plot_return_distribution(
     real: np.ndarray,
-    generated_last: Iterable[tuple[str, np.ndarray]],
+    generated_returns: Iterable[tuple[str, np.ndarray]],
+    horizon: str,
     out_path: Path,
 ) -> None:
     plt.figure(figsize=(9, 5))
-    plt.hist(real, bins=60, density=True, alpha=0.45, label="real_test_last_day")
-    for label, arr in generated_last:
+    plt.hist(real, bins=60, density=True, alpha=0.45, label=f"real_test_{horizon}")
+    for label, arr in generated_returns:
         plt.hist(arr, bins=60, density=True, alpha=0.35, label=f"gen_{label}")
-    plt.title("Return Distribution (Last Day)")
+    plt.title(f"Return Distribution ({horizon})")
     plt.xlabel("log return")
     plt.ylabel("density")
     plt.legend()
@@ -159,18 +181,19 @@ def plot_return_distribution(
 
 def plot_left_tail(
     real: np.ndarray,
-    generated_last: Iterable[tuple[str, np.ndarray]],
+    generated_returns: Iterable[tuple[str, np.ndarray]],
+    horizon: str,
     out_path: Path,
 ) -> None:
-    all_sets = [real] + [arr for _, arr in generated_last]
+    all_sets = [real] + [arr for _, arr in generated_returns]
     left = float(min(np.quantile(a, 0.01) for a in all_sets))
     right = float(max(np.quantile(a, 0.10) for a in all_sets))
 
     plt.figure(figsize=(9, 5))
-    plt.hist(real, bins=50, range=(left, right), density=True, alpha=0.5, label="real_test_last_day")
-    for label, arr in generated_last:
+    plt.hist(real, bins=50, range=(left, right), density=True, alpha=0.5, label=f"real_test_{horizon}")
+    for label, arr in generated_returns:
         plt.hist(arr, bins=50, range=(left, right), density=True, alpha=0.35, label=f"gen_{label}")
-    plt.title("Left Tail Zoom (Last Day)")
+    plt.title(f"Left Tail Zoom ({horizon})")
     plt.xlabel("log return")
     plt.ylabel("density")
     plt.legend()
@@ -181,19 +204,20 @@ def plot_left_tail(
 
 def plot_es_bar(
     real_es: float,
-    gen_last_metrics: list[tuple[str, float]],
+    gen_metrics: list[tuple[str, float]],
+    horizon: str,
     out_path: Path,
 ) -> None:
-    labels = [item[0] for item in gen_last_metrics]
-    es_vals = [item[1] for item in gen_last_metrics]
+    labels = [item[0] for item in gen_metrics]
+    es_vals = [item[1] for item in gen_metrics]
     xs = np.arange(len(labels))
 
     plt.figure(figsize=(8, 4.5))
     plt.bar(xs, es_vals, alpha=0.8)
     plt.axhline(real_es, color="red", linestyle="--", linewidth=1.5, label=f"real ES={real_es:.5f}")
     plt.xticks(xs, labels, rotation=15)
-    plt.title("ES(5%) by Condition (Last Day)")
-    plt.ylabel("ES(5%)")
+    plt.title(f"ES(alpha) by Condition ({horizon})")
+    plt.ylabel("ES(alpha)")
     plt.legend()
     plt.tight_layout()
     plt.savefig(out_path, dpi=160)
@@ -207,6 +231,10 @@ def main() -> None:
     tables_dir = Path(args.tables_dir)
     figures_dir = Path(args.figures_dir)
     alpha = float(args.alpha)
+    checkpoint_filter = str(args.checkpoint_filter)
+    set_seed(int(args.seed))
+    if not 0.0 < alpha < 1.0:
+        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
 
     figures_dir.mkdir(parents=True, exist_ok=True)
 
@@ -214,9 +242,12 @@ def main() -> None:
     x_test = test_data["X"].astype(np.float32)
     real_last, real_cum = compute_portfolio_returns(x_test)
 
-    packs = load_generated_samples(sample_dir)
+    packs = load_generated_samples(sample_dir, checkpoint_filter=checkpoint_filter)
     if not packs:
-        raise FileNotFoundError(f"No sample files found in {sample_dir} (expected sample_*.npy)")
+        raise FileNotFoundError(
+            f"No sample files found in {sample_dir} for checkpoint filter '{checkpoint_filter}' "
+            "(expected sample_*.npy)"
+        )
 
     real_rows: list[dict[str, object]] = []
     gen_rows: list[dict[str, object]] = []
@@ -224,11 +255,13 @@ def main() -> None:
 
     real_last_metrics = risk_metrics(real_last, alpha=alpha)
     real_cum_metrics = risk_metrics(real_cum, alpha=alpha)
-    real_rows.append({"horizon": "last_day", **real_last_metrics})
-    real_rows.append({"horizon": "cum_20d", **real_cum_metrics})
+    real_rows.append({"horizon": "last_day", "baseline_scope": "overall_test", **real_last_metrics})
+    real_rows.append({"horizon": "cum_20d", "baseline_scope": "overall_test", **real_cum_metrics})
 
-    generated_for_plot: list[tuple[str, np.ndarray]] = []
+    generated_for_plot_last: list[tuple[str, np.ndarray]] = []
+    generated_for_plot_cum: list[tuple[str, np.ndarray]] = []
     gen_last_es: list[tuple[str, float]] = []
+    gen_cum_es: list[tuple[str, float]] = []
 
     for pack in packs:
         gen_last, gen_cum = compute_portfolio_returns(pack.log_returns)
@@ -274,25 +307,36 @@ def main() -> None:
             }
         )
 
-        generated_for_plot.append((label, gen_last))
+        generated_for_plot_last.append((label, gen_last))
+        generated_for_plot_cum.append((label, gen_cum))
         gen_last_es.append((label, m_last["es_5pct"]))
+        gen_cum_es.append((label, m_cum["es_5pct"]))
 
     real_path, gen_path, cmp_path = save_tables(real_rows, gen_rows, cmp_rows, tables_dir)
 
-    dist_fig = figures_dir / "d_return_dist_last_day.png"
-    tail_fig = figures_dir / "d_left_tail_compare_last_day.png"
-    es_fig = figures_dir / "d_es_by_condition_last_day.png"
+    dist_fig_last = figures_dir / "d_return_dist_last_day.png"
+    tail_fig_last = figures_dir / "d_left_tail_compare_last_day.png"
+    es_fig_last = figures_dir / "d_es_by_condition_last_day.png"
+    dist_fig_cum = figures_dir / "d_return_dist_cum_20d.png"
+    tail_fig_cum = figures_dir / "d_left_tail_compare_cum_20d.png"
+    es_fig_cum = figures_dir / "d_es_by_condition_cum_20d.png"
 
-    plot_return_distribution(real_last, generated_for_plot, dist_fig)
-    plot_left_tail(real_last, generated_for_plot, tail_fig)
-    plot_es_bar(real_last_metrics["es_5pct"], gen_last_es, es_fig)
+    plot_return_distribution(real_last, generated_for_plot_last, "last_day", dist_fig_last)
+    plot_left_tail(real_last, generated_for_plot_last, "last_day", tail_fig_last)
+    plot_es_bar(real_last_metrics["es_5pct"], gen_last_es, "last_day", es_fig_last)
+    plot_return_distribution(real_cum, generated_for_plot_cum, "cum_20d", dist_fig_cum)
+    plot_left_tail(real_cum, generated_for_plot_cum, "cum_20d", tail_fig_cum)
+    plot_es_bar(real_cum_metrics["es_5pct"], gen_cum_es, "cum_20d", es_fig_cum)
 
     print(f"[saved] {real_path}")
     print(f"[saved] {gen_path}")
     print(f"[saved] {cmp_path}")
-    print(f"[saved] {dist_fig}")
-    print(f"[saved] {tail_fig}")
-    print(f"[saved] {es_fig}")
+    print(f"[saved] {dist_fig_last}")
+    print(f"[saved] {tail_fig_last}")
+    print(f"[saved] {es_fig_last}")
+    print(f"[saved] {dist_fig_cum}")
+    print(f"[saved] {tail_fig_cum}")
+    print(f"[saved] {es_fig_cum}")
     print("[summary]")
     print(
         f"  real_last_day: mean={real_last_metrics['mean']:.6f}, "
@@ -302,6 +346,7 @@ def main() -> None:
         f"  real_cum20d: mean={real_cum_metrics['mean']:.6f}, "
         f"VaR5={real_cum_metrics['var_5pct']:.6f}, ES5={real_cum_metrics['es_5pct']:.6f}"
     )
+    print(f"  checkpoint_filter={checkpoint_filter} alpha={alpha:.4f} seed={int(args.seed)}")
 
 
 if __name__ == "__main__":
