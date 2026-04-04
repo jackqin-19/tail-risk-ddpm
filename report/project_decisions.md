@@ -43,3 +43,18 @@
 - MLP backbone first
 - tail sample weight = 3
 - Implementation status: complete for C module (`model.py`, `diffusion.py`, `train.py`, `sample.py`)
+
+## Evaluation
+- Compare real test windows vs generated samples on two horizons:
+  - `last_day`
+  - `cum_20d`
+- Primary risk metrics: mean, std, VaR(5%), ES(5%), worst return
+- Distribution diagnostics: KS statistic/p-value and histogram Spearman correlation
+
+## Attribution
+- Single-factor what-if perturbation around a base condition
+- Factors: `cumret_5d`, `vol_20d`, `amount_change_5d`, `high_vol`
+- Output deltas relative to baseline:
+  - `delta_var_5pct`
+  - `delta_es_5pct`
+- Implementation status: complete for D module (`evaluate.py`, `attribution.py`)

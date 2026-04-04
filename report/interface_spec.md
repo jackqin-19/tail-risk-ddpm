@@ -64,3 +64,24 @@ Additional sample artifacts:
 Notes:
 - `sample_{condition}_{ckpt}.npy` stores 20-step log-return paths.
 - `_price.npy` is derived from log-returns via cumulative sum + exponential.
+
+## D outputs
+
+### Evaluation tables
+- `outputs/tables/d_real_risk_metrics.csv`
+- `outputs/tables/d_generated_risk_metrics.csv`
+- `outputs/tables/d_distribution_compare.csv`
+
+### Attribution table
+- `outputs/tables/d_factor_sensitivity.csv`
+
+### D figures
+- `outputs/figures/d_return_dist_last_day.png`
+- `outputs/figures/d_left_tail_compare_last_day.png`
+- `outputs/figures/d_es_by_condition_last_day.png`
+- `outputs/figures/d_factor_sensitivity_es_last_day.png`
+- `outputs/figures/d_factor_sensitivity_es_cum_20d.png`
+
+Conventions:
+- Evaluation horizons use `last_day` and `cum_20d`.
+- Attribution rows include baseline and per-factor perturbation records.

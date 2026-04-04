@@ -10,10 +10,10 @@
 | Diffusion forward/reverse process | Complete |
 | Training loop | Complete |
 | DDPM sampler | Complete |
-| Evaluation (VaR, ES, KS, Spearman) | Pending |
-| Attribution (marginal + Shapley) | Pending |
+| Evaluation (VaR, ES, KS, Spearman) | Complete |
+| Attribution (single-factor what-if) | Complete |
 | Exploratory notebooks | Complete |
-| End-to-end run on real data | Complete (A->B->C) |
+| End-to-end run on real data | Complete (A->B->C->D) |
 | Hyperparameter tuning | Pending |
 | Report write-up | Pending |
 
@@ -34,7 +34,7 @@
 - B module produces balanced-panel datasets (`dataset_train/valid/test.npz`) from common dates.
 - With current asset pool, common-date range starts at 2020-11-16 due to asset listing dates.
 - C module now trains and samples successfully on current dataset with saved checkpoints and sample artifacts.
-- Evaluation findings are not finalized because D module is still pending.
+- D module now generates evaluation and attribution tables/figures in `outputs/tables` and `outputs/figures`.
 
 ---
 
@@ -43,6 +43,6 @@
 - [x] Run `download_data.py` -> `preprocess.py` end-to-end.
 - [x] Run `make_dataset.py` and generate `dataset_*.npz`.
 - [x] Implement `model.py`, `diffusion.py`, `train.py`, and `sample.py`.
-- [ ] Implement `evaluate.py` and `attribution.py`.
-- [ ] Run end-to-end training, sampling, and evaluation.
+- [x] Implement `evaluate.py` and `attribution.py`.
+- [x] Run end-to-end training, sampling, and evaluation.
 - [ ] Finalize report section with quantitative tables and figures.
