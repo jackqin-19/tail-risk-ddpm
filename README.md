@@ -144,10 +144,11 @@ Notes:
 - `notebooks/03_figures.ipynb`
   - D-module presentation notebook from `outputs/tables/d_*.csv` and `outputs/figures/d_*.png`.
   - Focus: real-vs-generated risk gaps, distribution mismatch, and condition-level sensitivity interpretation.
+  - All three notebooks are presentation-oriented materials with explicit summaries, limitations, and reproducibility context.
 
 Notebook usage:
 - Run from project root with Jupyter/Lab.
-- Paths inside notebooks use `../...` relative to `notebooks/`.
+- Notebook paths auto-detect the project root and work when launched from either the repository root or `notebooks/`.
 
 ## Current Scope
 Midterm only:

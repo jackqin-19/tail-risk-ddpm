@@ -12,7 +12,7 @@
 | DDPM sampler | Complete |
 | Evaluation (VaR, ES, KS, Spearman) | Complete |
 | Attribution (single-factor what-if) | Complete |
-| Exploratory notebooks | Complete (refreshed and aligned with current A/B/D outputs) |
+| Exploratory notebooks | Complete (refreshed as presentation-oriented materials with summaries, caveats, and reproducibility context) |
 | End-to-end run on real data | Complete (A->B->C->D) |
 | Hyperparameter tuning | Pending |
 | Report write-up | Pending |
