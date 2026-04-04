@@ -142,6 +142,9 @@ def main() -> None:
     tail_weight = float(args.tail_weight) if args.tail_weight is not None else float(config.get("tail_weight", 3.0))
     normal_weight = float(config.get("normal_weight", 1.0))
     seed = int(args.seed) if args.seed is not None else int(config.get("seed", 42))
+    config["seed"] = int(seed)
+    config["tail_weight"] = float(tail_weight)
+    config["config_path"] = str(Path(args.config))
 
     cfg_device = str(config.get("device", "cpu")).lower()
     if cfg_device == "cuda" and not torch.cuda.is_available():

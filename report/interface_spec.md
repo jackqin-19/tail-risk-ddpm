@@ -54,7 +54,7 @@ Additional sample artifacts:
   - shape: [num_samples, 21, N]
   - dtype: float32
 - `sample_{condition}_{ckpt}_traj.npy` (when `save_trajectory=true`):
-  - full reverse-diffusion trajectory
+  - sparse reverse-diffusion trajectory
   - dtype: float32
 - `sample_{condition}_{ckpt}_traj_steps.npy` (when `save_trajectory=true`):
   - integer step indices aligned with `traj` first dimension
@@ -64,6 +64,7 @@ Additional sample artifacts:
 Notes:
 - `sample_{condition}_{ckpt}.npy` stores 20-step log-return paths.
 - `_price.npy` is derived from log-returns via cumulative sum + exponential.
+- trajectory saving uses fixed `save_interval=20` and always retains both `T` and `0`
 
 ## calibration outputs
 - `outputs/calibration/calibration_summary.csv`
@@ -71,6 +72,8 @@ Notes:
     - `seed`
     - `tail_weight`
     - `checkpoint_used`
+    - `is_baseline`
+    - `artifacts_scope`
     - `mean_wasserstein`
     - `mean_ks_stat`
     - `mean_abs_es_gap`
@@ -78,12 +81,14 @@ Notes:
     - `run_dir`
     - `rank`
 - `outputs/calibration/seed_{seed}_tailw_{tail_weight}/`
-  - snapshot of one calibration run
-  - contains copied `checkpoints`, `logs`, `samples`, `tables`, `figures`
+  - snapshot of one evaluation-only calibration run
+  - contains copied `checkpoints`, `logs`, `samples`, `tables`, `figures`, and `run_meta.json`
 
 Conventions:
 - calibration grid is fixed at seeds `42/52/62` and tail weights `1.0/3.0/5.0`
 - calibration generation and evaluation use `best` checkpoint only
+- calibration calls `sample.py --save-trajectory false`
+- `artifacts_scope` is fixed to `evaluation_only`
 - ranking priority: `mean_wasserstein` ascending, then `mean_abs_es_gap`, then `mean_ks_stat`
 
 ## D outputs

@@ -19,6 +19,16 @@ CHECKPOINT_DIR = Path("outputs/checkpoints")
 SAMPLE_OUT_DIR = Path("outputs/samples")
 WINDOW_LENGTH = 20
 COND_DIM = 4
+SAVE_INTERVAL = 20
+
+
+def str_to_bool(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"true", "1", "yes", "y"}:
+        return True
+    if normalized in {"false", "0", "no", "n"}:
+        return False
+    raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,6 +40,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional checkpoint override: latest, best, or explicit .pt path",
     )
     parser.add_argument("--n-samples", type=int, default=None, help="Optional override for config n_samples")
+    parser.add_argument(
+        "--save-trajectory",
+        type=str_to_bool,
+        default=None,
+        help="Optional override for config save_trajectory: true or false",
+    )
     return parser.parse_args()
 
 
@@ -116,12 +132,23 @@ def to_price_path_from_log_returns(log_returns: np.ndarray) -> np.ndarray:
     return np.concatenate([init, price_tail], axis=1)
 
 
+def sparse_indices_descending_steps(steps_desc: np.ndarray, interval: int) -> np.ndarray:
+    if steps_desc.ndim != 1:
+        raise ValueError("trajectory steps must be 1D.")
+    keep_idx = [i for i, step in enumerate(steps_desc.tolist()) if (step % interval) == 0]
+    keep_idx.append(0)
+    keep_idx.append(len(steps_desc) - 1)
+    return np.asarray(sorted(set(keep_idx)), dtype=np.int64)
+
+
 def main() -> None:
     args = parse_args()
     sample_cfg = load_yaml(Path(args.config))
     train_cfg = load_yaml(TRAIN_CONFIG_PATH)
     n_samples = int(args.n_samples) if args.n_samples is not None else int(sample_cfg.get("n_samples", 1000))
-    save_trajectory = bool(sample_cfg.get("save_trajectory", True))
+    save_trajectory = (
+        bool(args.save_trajectory) if args.save_trajectory is not None else bool(sample_cfg.get("save_trajectory", True))
+    )
 
     cfg_device = str(train_cfg.get("device", "cpu")).lower()
     if cfg_device == "cuda" and not torch.cuda.is_available():
@@ -190,13 +217,23 @@ def main() -> None:
             full_steps = result.trajectory_steps.astype(np.int32)
             if full_traj.shape[0] != full_steps.shape[0]:
                 raise ValueError("trajectory and trajectory_steps are not aligned.")
+            keep_idx = sparse_indices_descending_steps(full_steps, interval=SAVE_INTERVAL)
+            sparse_traj = full_traj[keep_idx].astype(np.float32)
+            sparse_steps = full_steps[keep_idx].astype(np.int32)
+            if sparse_traj.shape[0] != sparse_steps.shape[0]:
+                raise ValueError("sparse trajectory and sparse steps are not aligned.")
+            if sparse_steps[0] != full_steps[0] or sparse_steps[-1] != full_steps[-1]:
+                raise ValueError("sparse trajectory must retain both T and 0 endpoints.")
 
             traj_out = SAMPLE_OUT_DIR / f"sample_{label}_{ckpt_label}_traj.npy"
             step_out = SAMPLE_OUT_DIR / f"sample_{label}_{ckpt_label}_traj_steps.npy"
-            np.save(traj_out, full_traj)
-            np.save(step_out, full_steps)
-            print(f"[saved] {traj_out} shape={full_traj.shape} dtype={full_traj.dtype}")
-            print(f"[saved] {step_out} shape={full_steps.shape} dtype={full_steps.dtype}")
+            np.save(traj_out, sparse_traj)
+            np.save(step_out, sparse_steps)
+            print(
+                f"[saved] {traj_out} shape={sparse_traj.shape} dtype={sparse_traj.dtype} "
+                f"interval={SAVE_INTERVAL}"
+            )
+            print(f"[saved] {step_out} shape={sparse_steps.shape} dtype={sparse_steps.dtype}")
 
 
 if __name__ == "__main__":

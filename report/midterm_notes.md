@@ -41,6 +41,7 @@
 - Current B split caveat: validation tail density is much lower than train/test, so validation is a weak stress-regime proxy.
 - Current D finding: the evaluation layer is working, but generated distributions remain materially miscalibrated relative to real test data.
 - Current optimization priority: calibrate training/sampling first, then expand factors or upgrade the backbone if calibration remains insufficient.
+- Current calibration ledger is evaluation-only and does not include attribution sweeps.
 
 ---
 

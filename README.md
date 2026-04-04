@@ -92,17 +92,18 @@ Data documentation:
    - `outputs/logs/train_log.csv`
    - `outputs/samples/sample_{condition}_{ckpt}.npy`
    - `outputs/samples/sample_{condition}_{ckpt}_price.npy`
-- `outputs/samples/sample_{condition}_{ckpt}_traj.npy` (when `save_trajectory: true`)
-- `outputs/samples/sample_{condition}_{ckpt}_traj_steps.npy` (when `save_trajectory: true`)
+   - `outputs/samples/sample_{condition}_{ckpt}_traj.npy` (when `save_trajectory: true`)
+   - `outputs/samples/sample_{condition}_{ckpt}_traj_steps.npy` (when `save_trajectory: true`)
 
 Notes:
 - `sample_{condition}_{ckpt}.npy`: 20-step log-return paths `[num_samples, 20, N]`.
 - `{condition}` comes from keys under `conditions` in `configs/sample.yaml` (safe-sanitized).
 - `_price.npy`: includes explicit baseline `t0=1`, shape `[num_samples, 21, N]`.
-- `_traj.npy` is the full reverse-diffusion trajectory in `float32`,
+- `_traj.npy` is the sparse reverse-diffusion trajectory in `float32`,
   with aligned step index file `_traj_steps.npy` in `int32`, ordered from `T` to `0`.
+- Sparse trajectory saving uses fixed `save_interval=20` and always retains both `T` and `0`.
 - `train.py` supports optional CLI overrides `--config`, `--seed`, `--tail-weight`.
-- `sample.py` supports optional CLI overrides `--config`, `--checkpoint`, `--n-samples`.
+- `sample.py` supports optional CLI overrides `--config`, `--checkpoint`, `--n-samples`, `--save-trajectory`.
 
 ## Evaluation & Attribution Pipeline (D)
 1. Evaluate real vs generated risk metrics:
@@ -143,12 +144,15 @@ Notes:
    - fixed seeds: `42`, `52`, `62`
    - fixed tail weights: `1.0`, `3.0`, `5.0`
    - generation/evaluation use `best` checkpoint only
+   - calibration runs `sample.py --save-trajectory false`
 3. Generated files:
    - `outputs/calibration/calibration_summary.csv`
    - `outputs/calibration/seed_{seed}_tailw_{tail_weight}/...`
 
 Notes:
 - This stage prioritizes training/sampling calibration before condition expansion or backbone upgrades.
+- Calibration snapshots are evaluation-only and do not include attribution outputs.
+- Calibration runs overwrite the live `outputs/` runtime folders during execution; the authoritative archived results are under `outputs/calibration/...`.
 - `calibration_summary.csv` is the main experiment ledger and ranks runs by:
   `mean_wasserstein`, then `mean_abs_es_gap`, then `mean_ks_stat`.
 - Formal presentation should prefer the top-ranked `best` checkpoint run rather than `latest`.

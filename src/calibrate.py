@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,9 @@ CALIBRATION_DIR = OUTPUTS_DIR / "calibration"
 SUMMARY_PATH = CALIBRATION_DIR / "calibration_summary.csv"
 DEFAULT_SEEDS = [42, 52, 62]
 DEFAULT_TAIL_WEIGHTS = [1.0, 3.0, 5.0]
+ALPHA = 0.05
+CHECKPOINT_FILTER = "best"
+ARTIFACTS_SCOPE = "evaluation_only"
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,12 +58,37 @@ def copy_dir_if_exists(src: Path, dst: Path) -> None:
 
 
 def snapshot_run(run_dir: Path) -> None:
+    shutil.rmtree(run_dir, ignore_errors=True)
     run_dir.mkdir(parents=True, exist_ok=True)
     copy_dir_if_exists(CHECKPOINTS_DIR, run_dir / "checkpoints")
     copy_dir_if_exists(LOGS_DIR, run_dir / "logs")
     copy_dir_if_exists(SAMPLES_DIR, run_dir / "samples")
     copy_dir_if_exists(TABLES_DIR, run_dir / "tables")
     copy_dir_if_exists(FIGURES_DIR, run_dir / "figures")
+
+
+def save_run_meta(
+    run_dir: Path,
+    train_config_path: Path,
+    sample_config_path: Path,
+    seed: int,
+    tail_weight: float,
+    n_samples: int,
+) -> None:
+    meta = {
+        "train_seed": int(seed),
+        "evaluate_seed": int(seed),
+        "tail_weight": float(tail_weight),
+        "checkpoint_used": "best",
+        "checkpoint_filter": CHECKPOINT_FILTER,
+        "train_config_path": str(train_config_path),
+        "sample_config_path": str(sample_config_path),
+        "n_samples": int(n_samples),
+        "alpha": float(ALPHA),
+        "save_trajectory": False,
+        "artifacts_scope": ARTIFACTS_SCOPE,
+    }
+    (run_dir / "run_meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def load_run_metrics(run_dir: Path) -> dict[str, float]:
@@ -89,7 +118,6 @@ def build_run_dir(seed: int, tail_weight: float) -> Path:
 
 def main() -> None:
     args = parse_args()
-    train_cfg = load_yaml(Path(args.train_config))
     sample_cfg = load_yaml(Path(args.sample_config))
     sample_n = int(sample_cfg.get("n_samples", 1000))
 
@@ -131,6 +159,8 @@ def main() -> None:
                     "best",
                     "--n-samples",
                     str(sample_n),
+                    "--save-trajectory",
+                    "false",
                 ]
             )
             run_command(
@@ -138,19 +168,29 @@ def main() -> None:
                     python,
                     script_evaluate,
                     "--checkpoint-filter",
-                    "best",
+                    CHECKPOINT_FILTER,
                     "--seed",
                     str(seed),
                 ]
             )
 
             snapshot_run(run_dir)
+            save_run_meta(
+                run_dir=run_dir,
+                train_config_path=Path(args.train_config),
+                sample_config_path=Path(args.sample_config),
+                seed=seed,
+                tail_weight=tail_weight,
+                n_samples=sample_n,
+            )
             metrics = load_run_metrics(run_dir)
             rows.append(
                 {
                     "seed": int(seed),
                     "tail_weight": float(tail_weight),
                     "checkpoint_used": "best",
+                    "is_baseline": bool(seed == 42 and float(tail_weight) == 3.0),
+                    "artifacts_scope": ARTIFACTS_SCOPE,
                     **metrics,
                     "run_dir": str(run_dir.relative_to(ROOT)),
                 }
