@@ -1,74 +1,78 @@
-# Interface Spec
+# 接口说明
 
 ## prices.parquet
-Columns:
-- trade_date
-- asset
-- open
-- high
-- low
-- close
-- volume
-- amount
 
-Conventions:
-- sorted by (`trade_date`, `asset`)
-- `trade_date` dtype: datetime64[ns]
-- numeric fields are parsed as numeric types
-- default output may be unbalanced across assets before their listing dates
+字段如下：
+- `trade_date`
+- `asset`
+- `open`
+- `high`
+- `low`
+- `close`
+- `volume`
+- `amount`
+
+约定：
+- 按 (`trade_date`, `asset`) 排序
+- `trade_date` 类型为 `datetime64[ns]`
+- 数值字段会被解析为数值类型
+- 在部分资产上市日期之前，默认输出允许存在跨资产不平衡情况
 
 ## dataset_*.npz
-Contains:
-- X: shape [num_samples, 20, N]
-- C: shape [num_samples, K]
-- y_tail: shape [num_samples]
-- state_label: shape [num_samples]
-- trade_date: shape [num_samples], dtype datetime64[D]
-- asset_names: shape [N]
-- condition_names: shape [K]
-- split: shape [1]
 
-Current values in this repository:
-- N = 5 assets
-- K = 4 conditions (`cumret_5d`, `vol_20d`, `amount_change_5d`, `high_vol`)
-- window length = 20
-- files:
+包含以下内容：
+- `X`: 形状为 `[num_samples, 20, N]`
+- `C`: 形状为 `[num_samples, K]`
+- `y_tail`: 形状为 `[num_samples]`
+- `state_label`: 形状为 `[num_samples]`
+- `trade_date`: 形状为 `[num_samples]`，类型为 `datetime64[D]`
+- `asset_names`: 形状为 `[N]`
+- `condition_names`: 形状为 `[K]`
+- `split`: 形状为 `[1]`
+
+本仓库当前取值：
+- `N = 5` 个资产
+- `K = 4` 个条件变量，分别为 `cumret_5d`、`vol_20d`、`amount_change_5d`、`high_vol`
+- 窗口长度 `window length = 20`
+- 文件包括：
   - `data/processed/dataset_train.npz`
   - `data/processed/dataset_valid.npz`
   - `data/processed/dataset_test.npz`
 
-Related files:
+相关文件：
 - `data/processed/features.parquet`
 - `data/processed/tail_stats.json`
 - `outputs/tables/b_dataset_composition.csv`
 - `outputs/tables/b_feature_descriptive_stats.csv`
 
-## sample outputs
-- file name format: sample_{condition}_{ckpt}.npy
-- generated paths shape: [num_samples, 20, N]
-- dtype: float32
+## 采样输出
 
-Additional sample artifacts:
-- `sample_{condition}_{ckpt}_price.npy`:
-  - explicit baseline `t0=1` included
-  - shape: [num_samples, 21, N]
-  - dtype: float32
-- `sample_{condition}_{ckpt}_traj.npy` (when `save_trajectory=true`):
-  - sparse reverse-diffusion trajectory
-  - dtype: float32
-- `sample_{condition}_{ckpt}_traj_steps.npy` (when `save_trajectory=true`):
-  - integer step indices aligned with `traj` first dimension
-  - order: reverse sampling order from `T` to `0`
-  - dtype: int32
+- 文件命名格式：`sample_{condition}_{ckpt}.npy`
+- 生成路径张量形状：`[num_samples, 20, N]`
+- 数据类型：`float32`
 
-Notes:
-- `sample_{condition}_{ckpt}.npy` stores 20-step log-return paths.
-- `_price.npy` is derived from log-returns via cumulative sum + exponential.
-- trajectory saving uses fixed `save_interval=20` and always retains both `T` and `0`
+附加采样产物：
+- `sample_{condition}_{ckpt}_price.npy`
+  - 显式包含基准时点 `t0=1`
+  - 形状：`[num_samples, 21, N]`
+  - 类型：`float32`
+- `sample_{condition}_{ckpt}_traj.npy`（当 `save_trajectory=true` 时生成）
+  - 稀疏保存的反向扩散轨迹
+  - 类型：`float32`
+- `sample_{condition}_{ckpt}_traj_steps.npy`（当 `save_trajectory=true` 时生成）
+  - 与 `traj` 第一维对齐的整数时间步索引
+  - 顺序为从 `T` 到 `0` 的反向采样顺序
+  - 类型：`int32`
 
-## calibration outputs
+说明：
+- `sample_{condition}_{ckpt}.npy` 保存的是 20 步对数收益路径。
+- `_price.npy` 由对数收益通过累加后再指数化得到。
+- 轨迹保存使用固定 `save_interval=20`，并始终保留 `T` 和 `0` 两个端点。
+
+## 校准输出
+
 - `outputs/calibration/calibration_summary.csv`
-  - columns:
+  - 列包括：
     - `seed`
     - `tail_weight`
     - `checkpoint_used`
@@ -81,24 +85,25 @@ Notes:
     - `run_dir`
     - `rank`
 - `outputs/calibration/seed_{seed}_tailw_{tail_weight}/`
-  - snapshot of one evaluation-only calibration run
-  - contains copied `checkpoints`, `logs`, `samples`, `tables`, `figures`, and `run_meta.json`
+  - 表示一次“仅评估用途”的校准快照目录
+  - 其中包含复制后的 `checkpoints`、`logs`、`samples`、`tables`、`figures` 以及 `run_meta.json`
 
-Conventions:
-- calibration grid is fixed at seeds `42/52/62` and tail weights `1.0/3.0/5.0`
-- calibration generation and evaluation use `best` checkpoint only
-- calibration calls `sample.py --save-trajectory false`
-- `artifacts_scope` is fixed to `evaluation_only`
-- ranking priority: `mean_wasserstein` ascending, then `mean_abs_es_gap`, then `mean_ks_stat`
+约定：
+- 校准网格固定为 `seed in {42, 52, 62}` 与 `tail_weight in {1.0, 3.0, 5.0}`
+- 校准阶段的生成与评估仅使用 `best` checkpoint
+- 校准调用方式为 `sample.py --save-trajectory false`
+- `artifacts_scope` 固定为 `evaluation_only`
+- 排名优先级为：`mean_wasserstein` 升序，然后 `mean_abs_es_gap`，再然后 `mean_ks_stat`
 
-## D outputs
+## D 模块输出
 
-### Evaluation tables
+### 评估表
+
 - `outputs/tables/d_real_risk_metrics.csv`
-  - columns:
+  - 列包括：
     - `horizon`
     - `alpha`
-    - `baseline_scope` (`overall_test`)
+    - `baseline_scope`（`overall_test`）
     - `count`
     - `mean`
     - `std`
@@ -108,7 +113,7 @@ Conventions:
     - `es_alpha`
     - `worst`
 - `outputs/tables/d_generated_risk_metrics.csv`
-  - columns:
+  - 列包括：
     - `condition`
     - `checkpoint`
     - `horizon`
@@ -123,7 +128,7 @@ Conventions:
     - `worst`
     - `source_file`
 - `outputs/tables/d_distribution_compare.csv`
-  - columns:
+  - 列包括：
     - `condition`
     - `checkpoint`
     - `horizon`
@@ -132,9 +137,10 @@ Conventions:
     - `spearman_hist`
     - `wasserstein_distance`
 
-### Attribution table
+### 归因表
+
 - `outputs/tables/d_factor_sensitivity.csv`
-  - columns (current):
+  - 当前列包括：
     - `checkpoint`
     - `base_condition`
     - `factor`
@@ -152,7 +158,7 @@ Conventions:
     - `delta_var_5pct`
     - `delta_es_5pct`
 - `outputs/tables/d_factor_sensitivity_meta.json`
-  - fields:
+  - 字段包括：
     - `checkpoint`
     - `base_condition`
     - `n_samples`
@@ -161,7 +167,8 @@ Conventions:
     - `timesteps`
     - `seed`
 
-### D figures
+### D 模块图像
+
 - `outputs/figures/d_return_dist_last_day.png`
 - `outputs/figures/d_left_tail_compare_last_day.png`
 - `outputs/figures/d_es_by_condition_last_day.png`
@@ -171,7 +178,7 @@ Conventions:
 - `outputs/figures/d_factor_sensitivity_es_last_day.png`
 - `outputs/figures/d_factor_sensitivity_es_cum_20d.png`
 
-Conventions:
-- Evaluation horizons use `last_day` and `cum_20d`.
-- `evaluate.py` supports `--checkpoint-filter latest|best|all` (default: `latest`).
-- Attribution rows include baseline and per-factor perturbation records.
+约定：
+- 评估时间尺度使用 `last_day` 与 `cum_20d`。
+- `evaluate.py` 支持 `--checkpoint-filter latest|best|all`，默认值为 `latest`。
+- 归因结果同时包含 baseline 记录与各单因子扰动记录。

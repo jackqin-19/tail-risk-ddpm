@@ -1,70 +1,68 @@
-# Project Decisions
+# 项目关键决策
 
-## Data
-- Asset pool: Scheme A
-- Time range: 2015-01-01 to latest trading day
-- Frequency: daily
-- Return type: log return
-- Note: because assets have different listing dates, default `prices.parquet`
-  keeps full history (unbalanced panel). Use common-date alignment only when a
-  balanced panel is explicitly required.
+## 数据
+- 资产池：方案 A
+- 时间范围：`2015-01-01` 至最新交易日
+- 频率：日频
+- 收益类型：对数收益率
+- 说明：由于资产上市日期不同，默认 `prices.parquet` 保留各资产完整历史，因此是非平衡面板。只有在明确需要平衡面板时，才启用公共日期对齐。
 
-## Portfolio
-- Equal-weight portfolio
-- Rationale: MVP baseline with minimal assumptions and easy reproducibility.
-- Future extension: add weighting sensitivity checks (e.g., value-weighted / risk-parity) in final stage.
+## 组合
+- 使用等权组合
+- 原因：作为 MVP 基线，假设最少、复现最方便。
+- 后续扩展：在最终阶段可加入权重敏感性检验，例如市值加权 / 风险平价。
 
-## Tail Definition
-- Loss = - portfolio return
-- Tail flag if loss >= 95th percentile
-- Threshold is estimated on train split only to avoid look-ahead bias.
+## 尾部定义
+- 损失定义为 `- portfolio return`
+- 若损失大于等于 95% 分位数，则标记为尾部样本
+- 阈值仅在训练集上估计，以避免前视偏差
 
-## Factors
-- 5-day cumulative return
-- 20-day rolling volatility
-- 5-day amount change
-- high_vol state label
-- Continuous factors are standardized by train-split mean/std (high_vol remains binary).
+## 因子
+- 5 日累计收益
+- 20 日滚动波动率
+- 5 日成交额变化
+- `high_vol` 状态标签
+- 连续型因子按训练集均值 / 标准差标准化，`high_vol` 保持二值变量
 
-## Window
-- length = 20
+## 窗口
+- 长度 `length = 20`
 
-## Split
-- Configured boundary:
-  - train_end: 2022-12-31
-  - valid_end: 2023-12-31
-- Effective split on current common-date panel:
-  - train: 2020-11-16 to 2022-12-30
-  - valid: 2023-01-03 to 2023-12-29
-  - test: 2024-01-02 to latest
+## 数据划分
+- 配置边界：
+  - `train_end: 2022-12-31`
+  - `valid_end: 2023-12-31`
+- 当前公共日期面板下的实际划分：
+  - `train`: `2020-11-16` 至 `2022-12-30`
+  - `valid`: `2023-01-03` 至 `2023-12-29`
+  - `test`: `2024-01-02` 至最新日期
 
-## Model
-- minimal conditional DDPM
-- MLP backbone first
-- tail sample weight = 3
-- Implementation status: complete for C module (`model.py`, `diffusion.py`, `train.py`, `sample.py`)
+## 模型
+- 使用极简条件 DDPM
+- 优先采用 MLP backbone
+- `tail sample weight = 3`
+- 当前实现状态：C 模块已完成，即 `model.py`、`diffusion.py`、`train.py`、`sample.py`
 
-## Calibration
-- Calibration grid completed on `seed in {42, 52, 62}` and `tail_weight in {1, 3, 5}`
-- Two runs are retained as reporting anchors:
-  - `seed_42_tailw_1.0`: preferred when overall distribution distance is the main objective
-  - `seed_42_tailw_3.0`: preferred when ES alignment to the real test set is the main objective
-- Decision boundary for the next stage:
-  - if distribution fit is the priority, continue from `tail_weight=1.0`
-  - if tail-risk metric alignment is the priority, continue from `tail_weight=3.0`
-  - if both are required at once, move to condition expansion or backbone upgrade rather than more seed/weight tuning
+## 校准
+- 已完成 `seed in {42, 52, 62}` 与 `tail_weight in {1, 3, 5}` 的校准网格
+- 当前保留两个结果作为报告展示锚点：
+  - `seed_42_tailw_1.0`：当整体分布距离是主要目标时优先展示
+  - `seed_42_tailw_3.0`：当 ES 与真实测试集对齐是主要目标时优先展示
+- 下一阶段的决策边界：
+  - 若优先分布拟合，则从 `tail_weight=1.0` 继续
+  - 若优先尾部风险指标对齐，则从 `tail_weight=3.0` 继续
+  - 若希望两者同时改进，应转向条件扩展或 backbone 升级，而不是继续做 seed / weight 微调
 
-## Evaluation
-- Compare real test windows vs generated samples on two horizons:
+## 评估
+- 在两个时间尺度上比较真实测试窗口与生成样本：
   - `last_day`
   - `cum_20d`
-- Primary risk metrics: mean, std, VaR(5%), ES(5%), worst return
-- Distribution diagnostics: KS statistic/p-value and histogram Spearman correlation
+- 主要风险指标：均值、标准差、VaR(5%)、ES(5%)、最差收益
+- 分布诊断指标：KS 统计量 / p 值，以及直方图 Spearman 相关
 
-## Attribution
-- Single-factor what-if perturbation around a base condition
-- Factors: `cumret_5d`, `vol_20d`, `amount_change_5d`, `high_vol`
-- Output deltas relative to baseline:
+## 归因
+- 采用围绕基准条件的单因子 what-if 扰动分析
+- 因子包括：`cumret_5d`、`vol_20d`、`amount_change_5d`、`high_vol`
+- 输出相对 baseline 的增量指标：
   - `delta_var_5pct`
   - `delta_es_5pct`
-- Implementation status: complete for D module (`evaluate.py`, `attribution.py`)
+- 当前实现状态：D 模块已完成，即 `evaluate.py`、`attribution.py`

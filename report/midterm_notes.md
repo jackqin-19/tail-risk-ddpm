@@ -1,63 +1,63 @@
-# Midterm Notes
+# 中期说明笔记
 
-## Status Summary
+## 当前状态汇总
 
-| Milestone | Status |
+| 里程碑 | 状态 |
 |-----------|--------|
-| Data download & preprocessing | Complete |
-| Dataset / DataLoader | Complete |
-| Model skeleton (MLP backbone) | Complete |
-| Diffusion forward/reverse process | Complete |
-| Training loop | Complete |
-| DDPM sampler | Complete |
-| Evaluation (VaR, ES, KS, Spearman) | Complete |
-| Attribution (single-factor what-if) | Complete |
-| Exploratory notebooks | Complete (refreshed as presentation-oriented materials with summaries, caveats, and reproducibility context) |
-| End-to-end run on real data | Complete (A->B->C->D) |
-| Calibration grid (seed x tail_weight) | Complete |
-| Hyperparameter tuning / model expansion | Pending |
-| Report write-up | Pending |
+| 数据下载与预处理 | 已完成 |
+| 数据集 / DataLoader | 已完成 |
+| 模型骨架（MLP backbone） | 已完成 |
+| 扩散正向 / 反向过程 | 已完成 |
+| 训练循环 | 已完成 |
+| DDPM 采样器 | 已完成 |
+| 评估模块（VaR、ES、KS、Spearman） | 已完成 |
+| 归因模块（单因子 what-if） | 已完成 |
+| 探索性 notebook | 已完成（已整理成适合展示的版本，包含结论、局限与复现说明） |
+| 基于真实数据的端到端流程 | 已完成（A->B->C->D） |
+| 校准网格（seed x tail_weight） | 已完成 |
+| 超参数微调 / 模型扩展 | 待开展 |
+| 报告写作整理 | 待开展 |
 
 ---
 
-## Open Questions
+## 当前开放问题
 
-1. **Classifier-free guidance**: Should we implement CFG to strengthen conditioning on the tail label?
-2. **Multi-step sequence generation**: Current evaluation focuses on the last day in each window; should we extend to multi-day risk metrics?
-3. **Exogenous volatility signal**: Should volatility regime be provided as an explicit conditioning scalar?
-4. **Calibration checks**: Should we add rank-histogram / PIT coverage tests?
-
----
-
-## Key Findings So Far
-
-- A module produces `prices.parquet` with full-history coverage from 2015 onward.
-- B module produces balanced-panel datasets (`dataset_train/valid/test.npz`) from common dates.
-- With current asset pool, common-date range starts at 2020-11-16 due to asset listing dates.
-- C module now trains and samples successfully on current dataset with saved checkpoints and sample artifacts.
-- D module now generates evaluation and attribution tables/figures in `outputs/tables` and `outputs/figures`.
-- Notebooks are now runnable and mapped to current outputs:
-  `01_data_check.ipynb`, `02_tail_label.ipynb`, `03_figures.ipynb`.
-- Current B split caveat: validation tail density is much lower than train/test, so validation is a weak stress-regime proxy.
-- Current D finding: the evaluation layer is working, but generated distributions remain materially miscalibrated relative to real test data.
-- Current optimization priority: calibrate training/sampling first, then expand factors or upgrade the backbone if calibration remains insufficient.
-- Current calibration ledger is evaluation-only and does not include attribution sweeps.
-- Current reporting uses two calibration anchors instead of a single winner:
-  `seed_42_tailw_1.0` for distribution-distance priority and `seed_42_tailw_3.0`
-  for ES-gap priority.
-- This calibration round is now a decision boundary:
-  continue with `tail_weight=1.0` if the next milestone prioritizes overall distribution fit,
-  continue with `tail_weight=3.0` if the next milestone prioritizes tail-risk metric alignment,
-  and move to condition expansion or backbone upgrade if both objectives must improve together.
+1. **Classifier-free guidance**：是否需要实现 CFG，以增强模型对尾部标签条件的响应？
+2. **多步序列生成**：当前评估重点在每个窗口的最后一天，是否要进一步扩展到多日风险指标？
+3. **外生波动信号**：是否应将波动状态作为一个显式条件输入？
+4. **校准检验**：是否需要补充 rank-histogram / PIT coverage 一类检验？
 
 ---
 
-## Next Steps
+## 当前阶段的主要发现
 
-- [x] Run `download_data.py` -> `preprocess.py` end-to-end.
-- [x] Run `make_dataset.py` and generate `dataset_*.npz`.
-- [x] Implement `model.py`, `diffusion.py`, `train.py`, and `sample.py`.
-- [x] Implement `evaluate.py` and `attribution.py`.
-- [x] Run end-to-end training, sampling, and evaluation.
-- [x] Add multi-seed, multi-tail-weight calibration workflow and summary ledger.
-- [ ] Finalize report section with quantitative tables and figures.
+- A 模块已经能够产出 `prices.parquet`，并覆盖自 2015 年以来的完整历史数据。
+- B 模块已经能够基于公共日期构建平衡面板数据集，输出 `dataset_train/valid/test.npz`。
+- 由于资产上市日期不同，当前资产池的公共日期区间起点为 `2020-11-16`。
+- C 模块已经能在当前数据集上完成训练和采样，并保存 checkpoint 与样本输出。
+- D 模块已经能够生成评估表、归因表以及对应图像，输出到 `outputs/tables` 与 `outputs/figures`。
+- 当前 notebook 已经可以直接运行，并与现有输出文件对应：
+  `01_data_check.ipynb`、`02_tail_label.ipynb`、`03_figures.ipynb`。
+- 当前 B 模块一个需要明确说明的限制是：验证集尾部样本密度明显低于训练集和测试集，因此验证集并不是一个理想的压力状态代理。
+- 当前 D 模块的核心结论是：评估层已经可用，但生成分布相对于真实测试数据仍存在明显失配。
+- 当前优化优先级是：先做训练 / 采样校准，再决定是否扩展条件变量或升级 backbone。
+- 当前校准台账是“仅评估用途”的，并不包含归因 sweep 的结果。
+- 当前报告建议保留两个校准锚点，而不是强行给出单一最优模型：
+  `seed_42_tailw_1.0` 用于强调整体分布距离表现，
+  `seed_42_tailw_3.0` 用于强调 ES gap 对齐表现。
+- 这一轮校准已经形成了一个明确的决策边界：
+  如果下一阶段优先考虑整体分布拟合，就从 `tail_weight=1.0` 继续；
+  如果优先考虑尾部风险指标对齐，就从 `tail_weight=3.0` 继续；
+  如果希望两者同时改进，就不应继续停留在 seed / tail_weight 微调，而应进入条件扩展或 backbone 升级。
+
+---
+
+## 下一步
+
+- [x] 跑通 `download_data.py` -> `preprocess.py` 的完整流程。
+- [x] 跑通 `make_dataset.py` 并生成 `dataset_*.npz`。
+- [x] 实现 `model.py`、`diffusion.py`、`train.py` 与 `sample.py`。
+- [x] 实现 `evaluate.py` 与 `attribution.py`。
+- [x] 完成端到端训练、采样与评估。
+- [x] 增加多 seed、多 tail_weight 的校准流程和汇总台账。
+- [ ] 将定量表格与图像整理进最终报告部分。

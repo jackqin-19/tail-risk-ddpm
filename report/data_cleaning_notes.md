@@ -1,16 +1,16 @@
-# Data Cleaning Notes
+# 数据清洗说明
 
-## A Module Scope
+## A 模块范围
 
-The A module builds a reproducible base price table for the selected asset pool:
-- download raw daily data by configured assets
-- standardize columns
-- clean invalid rows
-- export `data/processed/prices.parquet`
+A 模块负责为所选资产池构建可复现的基础价格表，主要工作包括：
+- 按配置资产下载原始日频数据
+- 统一字段名称
+- 清洗无效记录
+- 导出 `data/processed/prices.parquet`
 
-## Raw-to-Standard Mapping
+## 原始字段到标准字段的映射
 
-Raw CSV Chinese columns are mapped to standard names:
+原始 CSV 中的中文列名会映射为统一标准名：
 - `日期` -> `trade_date`
 - `开盘` -> `open`
 - `最高` -> `high`
@@ -19,33 +19,33 @@ Raw CSV Chinese columns are mapped to standard names:
 - `成交量` -> `volume`
 - `成交额` -> `amount`
 
-## Cleaning Rules
+## 清洗规则
 
-For each asset file:
-1. Keep only required columns listed above.
-2. Parse `trade_date` as datetime, numeric columns as numeric.
-3. Drop rows missing any key fields (`trade_date`, `open`, `high`, `low`, `close`).
-4. Drop rows with non-positive prices (`open/high/low/close <= 0`).
-5. Drop duplicate rows by (`trade_date`, `asset`) keeping first.
-6. Sort by date.
+针对每个资产文件，执行以下处理：
+1. 仅保留上面列出的必需字段。
+2. 将 `trade_date` 解析为 datetime 类型，数值列解析为数值类型。
+3. 删除关键字段缺失的记录：`trade_date`、`open`、`high`、`low`、`close`。
+4. 删除价格非正的记录：`open/high/low/close <= 0`。
+5. 按 (`trade_date`, `asset`) 去重，保留第一条。
+6. 按日期升序排序。
 
-After concatenation:
-- sort by (`trade_date`, `asset`)
-- optional `--align-common-dates` keeps only dates available for all selected assets
+在所有资产拼接后，还会执行：
+- 按 (`trade_date`, `asset`) 统一排序
+- 可选使用 `--align-common-dates`，只保留所有选定资产共同拥有的交易日期
 
-## Quality Outputs
+## 质量输出
 
-`src/preprocess.py` also saves:
+`src/preprocess.py` 还会额外保存：
 - `outputs/tables/a_data_quality_summary.csv`
 
-This file contains:
-- per-asset source file, date range, trading-day count
-- raw rows vs final rows
-- key missing rows, dropped NA rows
-- invalid-price rows, duplicate rows removed
-- overall missing rate
+该文件包含：
+- 各资产源文件、日期区间、交易日数量
+- 原始行数与最终保留行数
+- 关键字段缺失行数、因 NA 被删除的行数
+- 无效价格行数、被移除的重复行数
+- 整体缺失率
 
-## Impact of Common-Date Alignment
+## 公共日期对齐的影响
 
-- Without alignment: keeps full per-asset history (unbalanced panel).
-- With alignment: returns a balanced panel for multi-asset modeling but may shorten the start date because of newer listings.
+- 不对齐时：保留各资产完整历史，形成非平衡面板。
+- 对齐后：适合多资产联合建模，可得到平衡面板，但由于部分资产上市较晚，样本起始日期可能明显后移。
